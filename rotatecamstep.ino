@@ -30,8 +30,8 @@
 #define JOYSTICK_YAXIS 13
 #define JOYSTICK_BUTTON 14
 
-#define STEP_DIR 33
-#define STEP_PUL 32
+#define STEP_DIR 32
+#define STEP_PUL 33
 #define FVOLT 0
 #define PART_BOUNDARY "123456789000000000000987654321"
 
@@ -77,7 +77,7 @@ static const char* _STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %
 
 httpd_handle_t stream_httpd = NULL;
 
-
+camera_config_t config;
 
 static esp_err_t stream_handler(httpd_req_t *req){
   camera_fb_t * fb = NULL;
@@ -138,30 +138,7 @@ static esp_err_t stream_handler(httpd_req_t *req){
   return res;
 }
 
-void startCameraServer(){
-  httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-  config.server_port = 80;
-
-  httpd_uri_t index_uri = {
-    .uri       = "/",
-    .method    = HTTP_GET,
-    .handler   = stream_handler,
-    .user_ctx  = NULL
-  };
-  
-  //Serial.printf("Starting web server on port: '%d'\n", config.server_port);
-  if (httpd_start(&stream_httpd, &config) == ESP_OK) {
-    httpd_register_uri_handler(stream_httpd, &index_uri);
-  }
-}
-
-void setup() {
-  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
- 
-  Serial.begin(115200);
-  Serial.setDebugOutput(false);
-  
-  camera_config_t config;
+void camera_init(){
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
   config.pin_d0 = Y2_GPIO_NUM;
@@ -192,8 +169,33 @@ void setup() {
     config.jpeg_quality = 12;
     config.fb_count = 1;
   }
+}
+
+void startCameraServer(){
+  httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+  config.server_port = 80;
+
+  httpd_uri_t index_uri = {
+    .uri       = "/",
+    .method    = HTTP_GET,
+    .handler   = stream_handler,
+    .user_ctx  = NULL
+  };
+  
+  //Serial.printf("Starting web server on port: '%d'\n", config.server_port);
+  if (httpd_start(&stream_httpd, &config) == ESP_OK) {
+    httpd_register_uri_handler(stream_httpd, &index_uri);
+  }
+}
+
+void setup() {
+  //WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
+ 
+  Serial.begin(115200);
+  //Serial.setDebugOutput(false);
   
   // Camera init
+  camera_init();
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("Camera init failed with error 0x%x", err);
@@ -227,48 +229,87 @@ void setup() {
   startVal = analogRead(JOYSTICK_XAXIS);
 }
 
+int x;
+
 void loop() {
-  if(!send_commands){
-    if(pseudo_timer >= 200){
-      send_commands = true;
-    }
-    pseudo_timer++;
+  // if(!send_commands){
+  //   if(pseudo_timer >= 200){
+  //     send_commands = true;
+  //   }
+  //   pseudo_timer++;
+  // }
+
+  // xValue = analogRead(JOYSTICK_XAXIS);
+  // yValue = analogRead(JOYSTICK_YAXIS);
+
+  // if (xValue < int(0.9 * startVal)){
+  //   move = true;
+  //   reverse = true;
+  // }
+  // else if (xValue > int(1.1 * startVal)){
+  //   move = true;
+  //   reverse = false;
+  // }
+  // else{
+  //   move = false;
+  // }
+  // Serial.print("XVal:");
+  // Serial.println(xValue);
+  // Serial.print("YVal:");
+  // Serial.println(yValue);
+
+  // // if(send_commands){
+  // //   if(move){
+  // //     digitalWrite(STEP_DIR, HIGH);
+  // //   }
+  // //   else{
+  // //     digitalWrite(STEP_DIR, LOW);
+  // //   }
+  // //   if(move){
+  // //     digitalWrite(STEP_PUL, HIGH);
+  // //   }
+  // //   else{
+  // //     digitalWrite(STEP_PUL, LOW);
+  // //   }
+  // //   pseudo_timer = 0;
+  // //   send_commands = false;
+  // // }
+  // delay(250);
+  // put your main code here, to run repeatedly:
+
+  digitalWrite(32,HIGH); //set direction "go backwards"
+  digitalWrite(33, HIGH);
+  //Serial.println("Pin 32 DIR has now been set to on HIGH");
+  delayMicroseconds(1500);
+
+  delayMicroseconds(500); //wait (pause) for 500 microseconds 
+  for(x=0;x<80;x++) //this loop dictates the distance it travels (or maybe the time that it travels??)
+
+  {
+    digitalWrite(33,HIGH); //pulse (move) the motor 
+    delayMicroseconds(500); //wait (pause) for 500 microseconds 
+
+    digitalWrite(33,LOW); //stop the motor 
+    delayMicroseconds(500); //wait (pause) for 500 microseconds 
+
+  }
+  delayMicroseconds(500);
+  delay(1000);
+
+  digitalWrite(32,LOW); //Set direction to be the opposite way
+
+  //Serial.println("Pin 32 DIR has been being set to on LOW");
+  delayMicroseconds(1500);
+
+  delayMicroseconds(500); //wait (pause) for 500 microseconds 
+  for(x=0;x<80;x++) //this loop dictates the distance it travels. 
+  {
+    digitalWrite(33,HIGH); //pulse (move) the motor 
+    delayMicroseconds(500); //wait (pause) for 500 microseconds 
+    digitalWrite(33,LOW); //stop the motor 
+    delayMicroseconds(500); //wait (pause) for 500 microseconds 
+
   }
 
-  xValue = analogRead(JOYSTICK_XAXIS);
-  yValue = analogRead(JOYSTICK_YAXIS);
-
-  if (xValue < int(0.9 * startVal)){
-    move = true;
-    reverse = true;
-  }
-  else if (xValue > int(1.1 * startVal)){
-    move = true;
-    reverse = false;
-  }
-  else{
-    move = false;
-  }
-  Serial.print("XVal:");
-  Serial.println(xValue);
-  Serial.print("YVal:");
-  Serial.println(yValue);
-
-  if(send_commands){
-    if(move){
-      digitalWrite(STEP_DIR, HIGH);
-    }
-    else{
-      digitalWrite(STEP_DIR, LOW);
-    }
-    if(move){
-      digitalWrite(STEP_PUL, HIGH);
-    }
-    else{
-      digitalWrite(STEP_PUL, LOW);
-    }
-    pseudo_timer = 0;
-    send_commands = false;
-  }
-  delay(250);
+  delay(1000);
 }
